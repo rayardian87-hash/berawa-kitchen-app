@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Berawa Kitchen — Manajemen Sewa &amp; Keuangan</title>
+<meta name="description" content="Manajemen sewa tenant, bar, parkir, kios ATM & ruko untuk Berawa Kitchen">
+<meta name="theme-color" content="#3A2E2E">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Berawa Kitchen">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ===== Layar awal: sambungkan ke Google Sheets (Web App URL) ===== -->
+<div id="screen-setup" class="screen name-screen">
+  <div class="name-card">
+    <div class="logo-mark">BK</div>
+    <h1>Berawa Kitchen</h1>
+    <p class="muted">Tempel Web App URL dari Google Apps Script kamu di sini supaya data tersambung ke Google Sheets. Belum setup? Lihat <strong>SETUP_GUIDE.md</strong> di paket aplikasi dulu.</p>
+    <input id="input-webapp-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+    <button id="btn-save-webapp-url" class="btn btn-primary btn-block">Sambungkan</button>
+    <button id="btn-skip-setup" class="link-btn" style="margin-top:10px;">Lewati dulu, jelajahi tampilan app</button>
+    <p id="setup-status" class="muted small" style="padding-top:14px;"></p>
+  </div>
+</div>
+
+<!-- ===== App shell ===== -->
+<div id="app" class="app hidden">
+
+  <header class="topbar">
+    <div class="topbar-title">
+      <span class="logo-mark small">BK</span>
+      <div>
+        <div class="title">Berawa Kitchen</div>
+        <div class="subtitle" id="topbar-subtitle">Sewa &amp; Keuangan</div>
+      </div>
+    </div>
+    <button id="btn-notif" class="icon-btn" title="Aktifkan notifikasi" aria-label="Notifikasi">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    </button>
+  </header>
+
+  <main class="content">
+
+    <!-- ---------- DASHBOARD ---------- -->
+    <section id="page-dashboard" class="page">
+
+      <div class="due-banner hidden" id="due-banner">
+        <div class="due-banner-title">⏰ Jatuh Tempo Terdekat</div>
+        <div id="due-banner-list"></div>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-tile">
+          <div class="stat-icon in">↓</div>
+          <div>
+            <div class="stat-label">Pendapatan Bulan Ini</div>
+            <div class="stat-value" id="stat-in-month">Rp 0</div>
+          </div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-icon out">↑</div>
+          <div>
+            <div class="stat-label">Pengeluaran Bulan Ini</div>
+            <div class="stat-value" id="stat-out-month">Rp 0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="balance-card">
+        <div class="balance-label">Laba Bersih Bulan Ini</div>
+        <div class="balance-value" id="balance-value">Rp 0</div>
+        <div class="balance-sub" id="balance-sub">Belum ada transaksi bulan ini</div>
+      </div>
+
+      <div class="section-head">
+        <h2>Pendapatan per Sumber (Bulan Ini)</h2>
+      </div>
+      <div class="card chart-card">
+        <canvas id="chart-source" height="180" role="img" aria-label="Grafik pendapatan per sumber"></canvas>
+        <div class="legend" id="legend-source"></div>
+      </div>
+
+      <div class="section-head">
+        <h2>Transaksi Terbaru</h2>
+        <button class="link-btn" data-nav="laporan">Lihat laporan</button>
+      </div>
+      <div id="recent-list" class="tx-list"></div>
+    </section>
+
+    <!-- ---------- UNIT SEWA ---------- -->
+    <section id="page-unit" class="page">
+      <div class="page-title-row">
+        <h2 class="page-title">Unit Sewa</h2>
+        <button id="btn-add-unit" class="btn btn-primary btn-sm">+ Unit</button>
+      </div>
+
+      <div class="filter-row">
+        <select id="filter-unit-type">
+          <option value="semua">Semua Tipe</option>
+          <option value="tenant_makanan">Tenant Makanan</option>
+          <option value="bar">Bar</option>
+          <option value="parkir">Parkir</option>
+          <option value="kios_atm">Kios ATM</option>
+          <option value="ruko">Ruko</option>
+        </select>
+        <select id="filter-unit-status">
+          <option value="semua">Semua Status</option>
+          <option value="aktif" selected>Aktif</option>
+          <option value="nonaktif">Nonaktif</option>
+        </select>
+      </div>
+
+      <div id="unit-list" class="unit-list"></div>
+      <div id="unit-empty" class="empty-state hidden">
+        <p>Belum ada unit. Tekan "+ Unit" untuk menambahkan tenant, bar, parkir, kios ATM, atau ruko.</p>
+      </div>
+    </section>
+
+    <!-- ---------- CATAT TRANSAKSI ---------- -->
+    <section id="page-catat" class="page">
+      <h2 class="page-title">Catat Transaksi</h2>
+
+      <div class="type-switch">
+        <button type="button" class="type-btn active" data-type="masuk">Pendapatan</button>
+        <button type="button" class="type-btn" data-type="keluar">Pengeluaran</button>
+      </div>
+
+      <!-- Upload bukti / OCR -->
+      <div class="card upload-card">
+        <label class="upload-zone" id="upload-zone">
+          <input type="file" id="input-file-bukti" accept="image/*" capture="environment" hidden>
+          <div id="upload-placeholder">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+            <div>Upload foto kwitansi / bukti transfer</div>
+            <div class="muted small">Sistem coba baca nominal &amp; tanggal otomatis (OCR)</div>
+          </div>
+          <img id="upload-preview" class="hidden" alt="Preview bukti">
+        </label>
+        <div id="ocr-status" class="ocr-status hidden"></div>
+      </div>
+
+      <form id="form-transaksi" class="form">
+
+        <div id="field-unit" class="field">
+          <span>Unit Terkait (khusus pendapatan sewa)</span>
+          <select id="input-unit">
+            <option value="">— Tidak terkait unit (pendapatan lain) —</option>
+          </select>
+        </div>
+
+        <div id="field-omzet" class="field hidden">
+          <span>Omzet Dilaporkan Bar (untuk hitung bagi hasil)</span>
+          <input id="input-omzet" type="text" inputmode="numeric" placeholder="0">
+          <div class="muted small" id="omzet-hint"></div>
+        </div>
+
+        <label id="field-kategori" class="field">
+          <span>Kategori</span>
+          <select id="input-kategori"></select>
+        </label>
+
+        <label class="field">
+          <span>Jumlah (Rp)</span>
+          <input id="input-jumlah" type="text" inputmode="numeric" placeholder="0" required>
+        </label>
+
+        <label class="field">
+          <span>Keterangan (opsional)</span>
+          <input id="input-deskripsi" type="text" placeholder="mis. Sewa Agustus 2026" maxlength="120">
+        </label>
+
+        <label class="field">
+          <span>Tanggal</span>
+          <input id="input-tanggal" type="date" required>
+        </label>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg">Simpan Transaksi</button>
+      </form>
+    </section>
+
+    <!-- ---------- LAPORAN ---------- -->
+    <section id="page-laporan" class="page">
+      <h2 class="page-title">Laporan Keuangan</h2>
+
+      <div class="segmented" id="laporan-period">
+        <button type="button" class="seg-btn active" data-period="month">Bulan Ini</button>
+        <button type="button" class="seg-btn" data-period="year">Tahun Ini</button>
+        <button type="button" class="seg-btn" data-period="all">Semua</button>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-tile in">
+          <div class="summary-label">Total Pendapatan</div>
+          <div class="summary-value" id="report-total-in">Rp 0</div>
+        </div>
+        <div class="summary-tile out">
+          <div class="summary-label">Total Pengeluaran</div>
+          <div class="summary-value" id="report-total-out">Rp 0</div>
+        </div>
+        <div class="summary-tile net">
+          <div class="summary-label">Laba / Rugi Bersih</div>
+          <div class="summary-value" id="report-net">Rp 0</div>
+        </div>
+      </div>
+
+      <div class="section-head"><h2>Tren Pendapatan vs Pengeluaran (6 Bulan)</h2></div>
+      <div class="card chart-card">
+        <canvas id="chart-trend" height="180"></canvas>
+        <div class="legend" id="legend-trend"></div>
+      </div>
+
+      <div class="section-head"><h2>Pengeluaran per Kategori</h2></div>
+      <div class="card chart-card">
+        <canvas id="chart-category" height="200"></canvas>
+        <div id="legend-category" class="legend"></div>
+      </div>
+
+      <a id="btn-open-sheet" href="#" target="_blank" rel="noopener" class="btn btn-secondary btn-block hidden">Buka Laporan Lengkap di Google Sheets ↗</a>
+      <button id="btn-export" class="btn btn-secondary btn-block">Ekspor ke CSV</button>
+    </section>
+
+    <!-- ---------- PENGATURAN ---------- -->
+    <section id="page-pengaturan" class="page">
+      <h2 class="page-title">Pengaturan</h2>
+
+      <div class="card">
+        <div class="setting-row"><span>Status Koneksi</span><strong id="settings-status">Memeriksa…</strong></div>
+        <label class="field" style="margin-top:10px;">
+          <span>Web App URL (Google Apps Script)</span>
+          <input id="input-settings-webapp" type="url" placeholder="https://script.google.com/macros/s/…/exec">
+        </label>
+        <label class="field">
+          <span>Link Google Sheet (opsional, untuk tombol "Buka di Sheets")</span>
+          <input id="input-settings-sheet" type="url" placeholder="https://docs.google.com/spreadsheets/d/…">
+        </label>
+        <button id="btn-save-connection" class="btn btn-primary btn-block">Simpan &amp; Tes Koneksi</button>
+      </div>
+
+      <div class="card">
+        <div class="setting-row">
+          <span>Notifikasi Jatuh Tempo</span>
+          <label class="switch">
+            <input type="checkbox" id="toggle-reminder">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <label class="field" style="margin-top:6px;">
+          <span>Ingatkan berapa hari sebelum jatuh tempo</span>
+          <input type="number" id="input-reminder-days" min="0" max="30" value="3">
+        </label>
+      </div>
+
+      <div class="card">
+        <div class="setting-row"><span>Versi Aplikasi</span><strong>2.0.0</strong></div>
+      </div>
+
+      <p class="muted small">Data tersimpan di Google Sheets milik kamu sendiri — bisa dibuka, diedit, atau dianalisis lebih lanjut kapan saja langsung dari Google Sheets.</p>
+    </section>
+
+  </main>
+
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-nav="dashboard">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>
+      <span>Beranda</span>
+    </button>
+    <button class="nav-btn" data-nav="unit">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span>Unit</span>
+    </button>
+    <button class="nav-btn fab" data-nav="catat">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <button class="nav-btn" data-nav="laporan">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg>
+      <span>Laporan</span>
+    </button>
+    <button class="nav-btn" data-nav="pengaturan">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Atur</span>
+    </button>
+  </nav>
+</div>
+
+<!-- ===== Modal: Tambah/Edit Unit ===== -->
+<div id="unit-modal" class="modal-overlay hidden">
+  <div class="modal-sheet">
+    <div class="modal-head">
+      <h3 id="unit-modal-title">Tambah Unit</h3>
+      <button id="btn-close-unit-modal" class="icon-btn">✕</button>
+    </div>
+    <form id="form-unit" class="form modal-body">
+      <input type="hidden" id="unit-id">
+      <label class="field">
+        <span>Nama Unit</span>
+        <input id="unit-nama" type="text" placeholder="mis. Tenant 03 - Sate Pak Joko" required>
+      </label>
+      <label class="field">
+        <span>Tipe</span>
+        <select id="unit-tipe" required>
+          <option value="tenant_makanan">Tenant Makanan</option>
+          <option value="bar">Bar</option>
+          <option value="parkir">Parkir</option>
+          <option value="kios_atm">Kios ATM</option>
+          <option value="ruko">Ruko</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Tipe Sewa</span>
+        <select id="unit-tipe-sewa" required>
+          <option value="tetap">Sewa Tetap</option>
+          <option value="tetap_bagi_hasil">Tetap + Bagi Hasil</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Nominal Sewa Tetap (Rp / siklus)</span>
+        <input id="unit-nominal" type="text" inputmode="numeric" placeholder="0" required>
+      </label>
+      <label id="unit-field-persen" class="field hidden">
+        <span>Persentase Bagi Hasil (%)</span>
+        <input id="unit-persen" type="number" min="0" max="100" step="0.5" placeholder="10">
+      </label>
+      <label class="field">
+        <span>Siklus Pembayaran</span>
+        <select id="unit-siklus">
+          <option value="1">Bulanan</option>
+          <option value="3">Triwulan (3 bulan)</option>
+          <option value="6">Semester (6 bulan)</option>
+          <option value="12">Tahunan</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Tanggal Mulai Sewa</span>
+        <input id="unit-tanggal-mulai" type="date" required>
+      </label>
+      <label class="field">
+        <span>Status</span>
+        <select id="unit-status">
+          <option value="aktif">Aktif</option>
+          <option value="nonaktif">Nonaktif</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Catatan (opsional)</span>
+        <input id="unit-catatan" type="text" maxlength="150">
+      </label>
+      <div class="modal-actions">
+        <button type="button" id="btn-delete-unit" class="btn btn-secondary danger hidden">Hapus Unit</button>
+        <button type="submit" class="btn btn-primary btn-block">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
